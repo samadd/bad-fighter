@@ -5,7 +5,7 @@ __lua__
 states = {["idle"] = "idle", ["walking"] = "walking", ["punching"] = "punching", ["jumping"] = "jumping", ["kicking"]="kicking"}
 states_preclude = {[states.idle] = {}, [states.walking] = {states.kicking}, [states.punching] = {}, [states.jumping] = {states.walking, states.kicking}}
 ground = 88
-gravity = 0.25
+gravity = 0.2
 
 function unpack_animation(frames, multiplier)
   local unpacked_frames = {}
@@ -68,7 +68,7 @@ cycles = {
 	    {["sprite"] = 20, ["x"] = 5, ["y"] = 8},
 	    {["sprite"] = 20, ["x"] = 4, ["y"] = 7},
 	    {["sprite"] = 19, ["x"] = 3, ["y"] = 8}
-	  }, 2)
+	  }, 1)
 	}
   },
   ["leg_front"] = {
@@ -101,11 +101,11 @@ cycles = {
 	[states.kicking] = {
 	  ["loop"] = false,
 	  ["frames"] = unpack_animation({
-		{["sprite"] = 34, ["x"] = 1, ["y"] = 16},
-		{["sprite"] = 35, ["x"] = 2, ["y"] = 14},
-		{["sprite"] = 36, ["x"] = 3, ["y"] = 12},
-		{["sprite"] = 35, ["x"] = 1, ["y"] = 15}
-	  }, 2)
+		{["sprite"] = 34, ["x"] = 2, ["y"] = 16},
+		{["sprite"] = 35, ["x"] = 3, ["y"] = 14},
+		{["sprite"] = 36, ["x"] = 4, ["y"] = 12},
+		{["sprite"] = 35, ["x"] = 2, ["y"] = 15}
+	  }, 1)
 	}
   },
   ["leg_back"] = {
