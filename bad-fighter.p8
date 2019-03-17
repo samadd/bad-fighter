@@ -2,8 +2,8 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
-states = {["idle"] = "idle", ["walking"] = "walking", ["punching"] = "punching", ["jumping"] = "jumping", ["kicking"]="kicking"}
-states_preclude = {[states.idle] = {}, [states.walking] = {states.kicking}, [states.punching] = {}, [states.jumping] = {states.walking, states.kicking}}
+states = {["idle"] = "idle", ["walking"] = "walking", ["punching"] = "punching", ["jumping"] = "jumping", ["landing"]="landing", ["kicking"]="kicking"}
+states_preclude = {[states.idle] = {}, [states.walking] = {states.kicking}, [states.punching] = {}, [states.jumping] = {states.walking, states.kicking}, [states.landing]={states.jumping, states.walking, states.kicking}}
 ground = 88
 gravity = 0.2
 
@@ -18,12 +18,16 @@ function unpack_animation(frames, multiplier)
 end
 
 function apply_gravity(s)
+  local lastY = s.y 
   s.y += s.vyc
   if s.y + s.height < ground then
     s.vyc += gravity
 	else
-	s.vyc = 0
-	s.y = ground - s.height
+    if s.y - lastY != 0 then
+      land(s)
+    end
+	  s.vyc = 0
+	  s.y = ground - s.height
   end
 end
 
@@ -33,11 +37,19 @@ cycles = {
 	  ["loop"] = true,
       ["frames"] = unpack_animation({
         {["sprite"] = 0, ["x"] = 0, ["y"] = 0},
-		{["sprite"] = 0, ["x"] = 1, ["y"] = 0},
-		{["sprite"] = 0, ["x"] = 1, ["y"] = 1},
-		{["sprite"] = 0, ["x"] = 0, ["y"] = 1}
+        {["sprite"] = 0, ["x"] = 1, ["y"] = 0},
+        {["sprite"] = 0, ["x"] = 1, ["y"] = 1},
+        {["sprite"] = 0, ["x"] = 0, ["y"] = 1}
       }, 4)
-	}
+	},
+    [states.landing] = {
+      ["loop"] = false,
+      ["frames"] = unpack_animation({
+        {["sprite"] = 0, ["x"] = 0, ["y"] = 2},
+        {["sprite"] = 0, ["x"] = 0, ["y"] = 4},
+        {["sprite"] = 0, ["x"] = 0, ["y"] = 1}
+      }, 1)
+    }
   },
   ["torso"] = {
     [states.idle] = {
@@ -48,6 +60,14 @@ cycles = {
         {["sprite"] = 16, ["x"] = 0, ["y"] = 8},
         {["sprite"] = 16, ["x"] = 1, ["y"] = 8}		
 	  }, 4)
+	},
+  [states.landing] = {
+	  ["loop"] = false,
+	  ["frames"] = unpack_animation({
+	    {["sprite"] = 16, ["x"] = 1, ["y"] = 10},
+        {["sprite"] = 16, ["x"] = 0, ["y"] = 11},
+        {["sprite"] = 16, ["x"] = 0, ["y"] = 9}		
+	  }, 2)
 	}
   },
   ["arm"] = {
@@ -59,6 +79,13 @@ cycles = {
 		{["sprite"] = 18, ["x"] = 1, ["y"] = 8},
 		{["sprite"] = 17, ["x"] = 0, ["y"] = 8}
 	  }, 4)
+	},
+  [states.landing] = {
+	  ["loop"] = false,
+	  ["frames"] = unpack_animation({
+	    {["sprite"] = 17, ["x"] = 0, ["y"] = 11},
+		  {["sprite"] = 18, ["x"] = 1, ["y"] = 12}
+	  }, 2)
 	},
 	[states.punching] = {
 	  ["loop"] = false,
@@ -98,15 +125,25 @@ cycles = {
 		{["sprite"] = 48, ["x"] = 0, ["y"] = 15}
 	  }, 3)
 	},
+  [states.landing] = {
+	  ["loop"] = false,
+	  ["frames"] = unpack_animation({
+		{["sprite"] = 48, ["x"] = 0, ["y"] = 17},
+		{["sprite"] = 49, ["x"] = 1, ["y"] = 18},
+		{["sprite"] = 48, ["x"] = 0, ["y"] = 19}
+	  }, 1)
+	},
 	[states.kicking] = {
 	  ["loop"] = false,
 	  ["frames"] = unpack_animation({
 		{["sprite"] = 34, ["x"] = 2, ["y"] = 16},
 		{["sprite"] = 35, ["x"] = 3, ["y"] = 14},
 		{["sprite"] = 36, ["x"] = 4, ["y"] = 12},
-		{["sprite"] = 35, ["x"] = 2, ["y"] = 15}
+    {["sprite"] = 36, ["x"] = 5, ["y"] = 11},
+		{["sprite"] = 35, ["x"] = 3, ["y"] = 13},
+    {["sprite"] = 35, ["x"] = 2, ["y"] = 14}
 	  }, 1)
-	}
+  }
   },
   ["leg_back"] = {
     [states.idle] = {
@@ -136,25 +173,34 @@ cycles = {
 		{["sprite"] = 48, ["x"] = 0, ["y"] = 15},
 		{["sprite"] = 33, ["x"] = 0, ["y"] = 16}
 	  }, 3)
+	},
+  [states.landing] = {
+	  ["loop"] = false,
+	  ["frames"] = unpack_animation({
+		{["sprite"] = 48, ["x"] = 0, ["y"] = 17},
+		{["sprite"] = 49, ["x"] = 1, ["y"] = 19},
+		{["sprite"] = 48, ["x"] = 0, ["y"] = 17}
+	  }, 1)
 	}
   }
 }
 
-function make_fighter(take_input, use_input)
+function make_fighter(take_input, use_input, colour, x, flipped)
   local f = {["components"]= {
     {["name"] = "head", ["def"] = cycles.head, ["state"] = states.idle, ["tick"] = 1},
-    {["name"] = "torso", ["def"] = cycles.torso, ["state"] = states.idle, ["tick"] = 1},
-    {["name"] = "arm", ["def"] = cycles.arm, ["state"] = states.idle, ["tick"] = 1},
-    {["name"] = "leg_back", ["def"] = cycles.leg_back, ["state"] = states.idle, ["tick"] = 1 },
-	{["name"] = "leg_front", ["def"] = cycles.leg_front, ["state"] = states.idle, ["tick"] = 1 }
+    {["name"] = "torso", ["def"] = cycles.torso, ["state"] = states.idle, ["tick"] = 1, ["coloured"] = true},
+    {["name"] = "arm", ["def"] = cycles.arm, ["state"] = states.idle, ["tick"] = 1, ["coloured"] = true},
+    {["name"] = "leg_back", ["def"] = cycles.leg_back, ["state"] = states.idle, ["tick"] = 1, ["coloured"] = true },
+	{["name"] = "leg_front", ["def"] = cycles.leg_front, ["state"] = states.idle, ["tick"] = 1, ["coloured"] = true }
   }}
   f.component_map = find_components(f.components)
-  f.x = 64
+  f.x = x
   f.y = 64
   f.vx = 0.5
   f.vy = -3
   f.vyc = 0
   f.height = 24
+  f.colour = colour
   function f:update()
     local input = take_input()
 	use_input(f, input.left, input.right, input.up, input.down, input.fire1, input.fire2)
@@ -164,6 +210,17 @@ end
 
 function player_input()
   return {["left"] = btn(0), ["right"] = btn(1), ["up"] = btn(2), ["down"] = btn(3), ["fire1"] = btn(4), ["fire2"] = btn(5)}
+end
+
+function cpu_input()
+  return {
+    ["left"] = rnd(100) > 98,
+    ["right"] = rnd(100) > 98,
+    ["up"] = rnd(100) > 98,
+    ["down"] = rnd(100) > 98,
+    ["fire1"] = rnd(100) > 98,
+    ["fire2"] = rnd(100) > 98
+  }
 end
 
 function check_if_precludes(curr_state, new_state)
@@ -201,11 +258,21 @@ function punch(p)
 end
 
 function jump(p)
+  if p.y + p.height != ground or check_if_precludes(p.component_map.leg_front.state, states.jumping) then
+    return
+  end
   p.vyc = p.vy
   p.component_map.leg_back.state = states.jumping
   p.component_map.leg_back.tick = 1
   p.component_map.leg_front.state = states.jumping
   p.component_map.leg_front.tick = 1
+end
+
+function land(p)
+  for c in all(p.components) do
+    c.state = states.landing
+    c.tick = 1
+  end
 end
 
 function kick(p)
@@ -225,7 +292,7 @@ function figher_update_1(p, left, right, up, down, fire1, fire2)
   if right then
     walk(p, 1)
   end
-  if up and p.y + p.height == ground then
+  if up then
     jump(p)
   end
   if fire1 then
@@ -254,18 +321,41 @@ function process_states(components)
   end
 end
 
+function get_orientfunc(flipped)
+  if flipped then
+    return function(v) return 8 - v end
+  end
+  return function(v) return v end
+end
+
 function compose_sprite(s)
   local frame
+  local orient_offset = get_orientfunc(s.flipped)
   for component in all(s.components) do
+    if component.coloured == true then
+      pal(6, s.colour)
+    end
     frame = component.def[component.state].frames[component.tick]
-    spr(frame.sprite, frame.x + s.x, frame.y + s.y)
+    spr(frame.sprite, s.x + orient_offset(frame.x), s.y + frame.y, 1, 1, s.flipped)
+    pal()
+  end
+end
+
+function orient_players(p1, p2)
+  if p1.x < p2.x then
+    p1.flipped = false
+    p2.flipped = true
+  else
+    p1.flipped = true
+    p2.flipped = false
   end
 end
 
 function _init()
   _update = game_update
   _draw = game_draw
-  player = make_fighter(player_input, figher_update_1)
+  player1 = make_fighter(player_input, figher_update_1, 8, 48)
+  player2 = make_fighter(cpu_input, figher_update_1, 11, 90)
 end
 
 function title_update()
@@ -277,12 +367,51 @@ function title_draw()
 end
 
 function game_update()
-  player:update()
+  player1:update()
+  player2:update()
+  orient_players(player1, player2)
 end
 
 function game_draw()
   cls()
-  compose_sprite(player)
+  draw_background1()
+  compose_sprite(player1)
+  compose_sprite(player2)
+end
+
+function draw_background1()
+  rectfill(0,0,128,5,0)
+  fillp(0b0101101001011010)
+  rectfill(0,6,128,11,0x01)
+  fillp()
+  rectfill(0,12,128,17,1)
+  fillp(0b0101101001011010)
+  rectfill(0,18,128,23,0x12)
+  fillp()
+  rectfill(0,24,128,29,2)
+  fillp(0b0101101001011010)
+  rectfill(0,30,128,35,0x28)
+  fillp()
+  rectfill(0,36,128,41,8)
+  fillp(0b0101101001011010)
+  rectfill(0,42,128,47,0x89)
+  fillp()
+  rectfill(0,48,128,53,9)
+  fillp(0b0101101001011010)
+  rectfill(0,54,128,59,0x9a)
+  fillp()
+  rectfill(0,60,128,65,10)
+  fillp(0b0101101001011010.1)
+  circfill(64,66,10,7)
+  fillp()
+  circfill(64,66,8,7)
+  rectfill(0,66,128,80,12)
+  clip(54,66,20,10)
+  fillp(0b0101101001011010.1)
+  circfill(64,65,9,15)
+  fillp()
+  circfill(64,65,5,15)
+  clip()
 end
 
 __gfx__
@@ -318,3 +447,19 @@ __gfx__
 55565000555555000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 55555500555000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00555500555000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+03300000300033300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+03333333303330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+30000034533000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000354430000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00033005453330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00030000400033000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00030000400003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00300000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000004400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000004400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000044440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
